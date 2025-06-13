@@ -1,0 +1,168 @@
+Uncaught TypeError: Cannot redefine property: ethereum
+    at Object.defineProperty (<anonymous>)
+    at r.inject (evmAsk.js:5:5093)
+    at SP.window.addEventListener.once (evmAsk.js:5:9013)Understand this error
+inject.chrome.3e05a493.js:1 Pocket Universe: window.ethereum found, attaching
+inject.chrome.3e05a493.js:1 Pocket Universe is running!
+inject.chrome.3e05a493.js:1 Pocket Universe: window.phantom.solana found, attaching
+inject.chrome.3e05a493.js:1 Pocket Universe is running for Solana!
+inject.chrome.3e05a493.js:1 Failed to define property TypeError: Cannot redefine property: ethereum
+    at Object.defineProperty (<anonymous>)
+    at l2Cug.~utils/log (inject.chrome.3e05a493.js:1:12979)
+    at l (inject.chrome.3e05a493.js:1:705)
+    at p (inject.chrome.3e05a493.js:1:809)
+    at cowF3.~utils/log (inject.chrome.3e05a493.js:1:6273)
+    at l (inject.chrome.3e05a493.js:1:705)
+    at p (inject.chrome.3e05a493.js:1:809)
+    at bAx4k.~utils/log (inject.chrome.3e05a493.js:1:1408)
+    at l (inject.chrome.3e05a493.js:1:705)
+    at bAx4k.~utils/log (inject.chrome.3e05a493.js:1:1090)
+in-page.js:1 Failed to set window.ethereum
+(anonymous) @ in-page.js:1Understand this warning
+inpage.js:1 MetaMask encountered an error setting the global Ethereum provider - this is likely due to another Ethereum wallet extension also setting the global Ethereum provider: TypeError: Cannot set property ethereum of #<Window> which has only a getter
+    at a (inpage.js:1:48818)
+    at r.initializeProvider (inpage.js:1:48589)
+    at Object.<anonymous> (inpage.js:1:2312)
+    at Object.<anonymous> (inpage.js:1:6320)
+    at 2.../../shared/modules/provider-injection (inpage.js:1:6333)
+    at s (inpage.js:1:254)
+    at e (inpage.js:1:414)
+    at inpage.js:1:431
+a @ inpage.js:1Understand this error
+in-page.js:9 Uncaught (in promise) TypeError: Cannot redefine property: isZerion
+    at Object.defineProperty (<anonymous>)
+    at Object.l (in-page.js:9:316030)
+    at Object.<anonymous> (in-page.js:1:1425)
+    at o (in-page.js:1:463)
+    at in-page.js:9:319110
+    at in-page.js:9:319121Understand this error
+content.js:2 Check phishing by URL: Passed.
+inject.chrome.3e05a493.js:1 Pocket Universe is running!
+contentScript.ts-C8mb-NdS.js:66 Razor Wallet Injected Successfully
+injected.js:1 Backpack couldn't override `window.ethereum`.
+Hxs @ injected.js:1Understand this warning
+client:536 WebSocket connection to 'wss://e48417f7-36ac-48b2-ae06-27ea53cc4c2d-00-3b0lz4o2bj2yg.spock.replit.dev/?token=Cib6W_rpWWVI' failed: 
+setupWebSocket @ client:536Understand this error
+client:536 Uncaught (in promise) SyntaxError: Failed to construct 'WebSocket': The URL 'wss://localhost:undefined/?token=Cib6W_rpWWVI' is invalid.
+    at setupWebSocket (client:536:19)
+    at fallback (client:509:16)
+    at WebSocket.<anonymous> (client:555:7)Understand this error
+chunk-SKRUXVEK.js?v=376f03cd:21551 Download the React DevTools for a better development experience: https://reactjs.org/link/react-devtools
+@privy-io_react-auth.js?v=376f03cd:1414 Module "buffer" has been externalized for browser compatibility. Cannot access "buffer.Buffer" in client code. See https://vite.dev/guide/troubleshooting.html#module-externalized-for-browser-compatibility for more details.
+get @ @privy-io_react-auth.js?v=376f03cd:1414Understand this warning
+twitch.ts:39 Connecting to Twitch channel: ninja
+content.js:1 AutoClicker initialize complete
+evmAsk.js:5 Uncaught TypeError: Cannot redefine property: ethereum
+    at Object.defineProperty (<anonymous>)
+    at r.inject (evmAsk.js:5:5093)
+    at SP.window.addEventListener.once (evmAsk.js:5:9013)Understand this error
+inject.chrome.3e05a493.js:1 Pocket Universe: window.ethereum found, attaching
+inject.chrome.3e05a493.js:1 Pocket Universe is running!
+inject.chrome.3e05a493.js:1 Pocket Universe: window.phantom.solana found, attaching
+inject.chrome.3e05a493.js:1 Pocket Universe is running for Solana!
+inject.chrome.3e05a493.js:1 Failed to define property TypeError: Cannot redefine property: ethereum
+    at Object.defineProperty (<anonymous>)
+    at l2Cug.~utils/log (inject.chrome.3e05a493.js:1:12979)
+    at l (inject.chrome.3e05a493.js:1:705)
+    at p (inject.chrome.3e05a493.js:1:809)
+    at cowF3.~utils/log (inject.chrome.3e05a493.js:1:6273)
+    at l (inject.chrome.3e05a493.js:1:705)
+    at p (inject.chrome.3e05a493.js:1:809)
+    at bAx4k.~utils/log (inject.chrome.3e05a493.js:1:1408)
+    at l (inject.chrome.3e05a493.js:1:705)
+    at bAx4k.~utils/log (inject.chrome.3e05a493.js:1:1090)
+in-page.js:1 Failed to set window.ethereum
+(anonymous) @ in-page.js:1Understand this warning
+inpage.js:1 MetaMask encountered an error setting the global Ethereum provider - this is likely due to another Ethereum wallet extension also setting the global Ethereum provider: TypeError: Cannot set property ethereum of #<Window> which has only a getter
+    at a (inpage.js:1:48818)
+    at r.initializeProvider (inpage.js:1:48589)
+    at Object.<anonymous> (inpage.js:1:2312)
+    at Object.<anonymous> (inpage.js:1:6320)
+    at 2.../../shared/modules/provider-injection (inpage.js:1:6333)
+    at s (inpage.js:1:254)
+    at e (inpage.js:1:414)
+    at inpage.js:1:431
+a @ inpage.js:1Understand this error
+twitch.ts:39 Connecting to Twitch channel: ninja
+@privy-io_react-auth.js?v=376f03cd:75518 The configured chains are not supported by Coinbase Smart Wallet: 10143, 10143
+@privy-io_react-auth.js?v=376f03cd:50122 The configured WalletConnect 'metadata.url':https://e48417f7-36ac-48b2-ae06-27ea53cc4c2d-00-3b0lz4o2bj2yg.spock.replit.dev/ differs from the actual page url:https://e48417f7-36ac-48b2-ae06-27ea53cc4c2d-00-3b0lz4o2bj2yg.spock.replit.dev. This is probably unintended and can lead to issues.
+oi @ @privy-io_react-auth.js?v=376f03cd:50122Understand this warning
+2twitch.ts:39 Connecting to Twitch channel: ninja
+chunk-7WLUAVPG.js?v=376f03cd:23 Lit is in dev mode. Not recommended for production! See https://lit.dev/msg/dev-mode for more information.
+issueWarning @ chunk-7WLUAVPG.js?v=376f03cd:23Understand this warning
+chunk-X2DRAL2U.js?v=376f03cd:13802 WalletConnect Core is already initialized. This is probably a mistake and can lead to unexpected behavior. Init() was called 2 times.
+getGlobalCore @ chunk-X2DRAL2U.js?v=376f03cd:13802Understand this warning
+chunk-X2DRAL2U.js?v=376f03cd:3487 Origin https://e48417f7-36ac-48b2-ae06-27ea53cc4c2d-00-3b0lz4o2bj2yg.spock.replit.dev not found on Allowlist - update configuration on cloud.reown.com
+open @ chunk-X2DRAL2U.js?v=376f03cd:3487Understand this error
+in-page.js:9 Uncaught (in promise) TypeError: Cannot redefine property: isZerion
+    at Object.defineProperty (<anonymous>)
+    at Object.l (in-page.js:9:316030)
+    at Object.<anonymous> (in-page.js:1:1425)
+    at o (in-page.js:1:463)
+    at in-page.js:9:319110
+    at in-page.js:9:319121Understand this error
+content.js:2 Check phishing by URL: Passed.
+inject.chrome.3e05a493.js:1 Pocket Universe is running!
+contentScript.ts-C8mb-NdS.js:66 Razor Wallet Injected Successfully
+injected.js:1 Backpack couldn't override `window.ethereum`.
+Hxs @ injected.js:1Understand this warning
+Refused to frame 'https://auth.privy.io/' because an ancestor violates the following Content Security Policy directive: "frame-ancestors 'self' http://localhost https://localhost https://auth.privy.io".
+Understand this error
+26526-4d404dc3f320284db360.js:1 ⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+Y @ 26526-4d404dc3f320284db360.js:1Understand this warning
+26526-4d404dc3f320284db360.js:1 ⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+Y @ 26526-4d404dc3f320284db360.js:1Understand this warning
+amazon-ivs-wasmworker.min-62daba899e8c2ea51a58.js:1 Amazon IVS Player SDK 1.42.0-rc.1
+twitch.ts:39 Connecting to Twitch channel: ninja
+amazon-ivs-wasmworker.min-62daba899e8c2ea51a58.js:1 MediaCapabilities found Array(5)
+player-core-base-0eb46d5a2d5b34bf2027.js:1 Moving to buffered region 0.007333 0
+n.play @ player-core-base-0eb46d5a2d5b34bf2027.js:1Understand this warning
+evmAsk.js:5 Uncaught TypeError: Cannot redefine property: ethereum
+    at Object.defineProperty (<anonymous>)
+    at r.inject (evmAsk.js:5:5093)
+    at SP.window.addEventListener.once (evmAsk.js:5:9013)Understand this error
+inject.chrome.3e05a493.js:1 Pocket Universe: window.ethereum found, attaching
+inject.chrome.3e05a493.js:1 Pocket Universe is running!
+inject.chrome.3e05a493.js:1 Pocket Universe: window.phantom.solana found, attaching
+inject.chrome.3e05a493.js:1 Pocket Universe is running for Solana!
+inject.chrome.3e05a493.js:1 Failed to define property TypeError: Cannot redefine property: ethereum
+    at Object.defineProperty (<anonymous>)
+    at l2Cug.~utils/log (inject.chrome.3e05a493.js:1:12979)
+    at l (inject.chrome.3e05a493.js:1:705)
+    at p (inject.chrome.3e05a493.js:1:809)
+    at cowF3.~utils/log (inject.chrome.3e05a493.js:1:6273)
+    at l (inject.chrome.3e05a493.js:1:705)
+    at p (inject.chrome.3e05a493.js:1:809)
+    at bAx4k.~utils/log (inject.chrome.3e05a493.js:1:1408)
+    at l (inject.chrome.3e05a493.js:1:705)
+    at bAx4k.~utils/log (inject.chrome.3e05a493.js:1:1090)
+in-page.js:1 Failed to set window.ethereum
+(anonymous) @ in-page.js:1Understand this warning
+inpage.js:1 MetaMask encountered an error setting the global Ethereum provider - this is likely due to another Ethereum wallet extension also setting the global Ethereum provider: TypeError: Cannot set property ethereum of #<Window> which has only a getter
+    at a (inpage.js:1:48818)
+    at r.initializeProvider (inpage.js:1:48589)
+    at Object.<anonymous> (inpage.js:1:2312)
+    at Object.<anonymous> (inpage.js:1:6320)
+    at 2.../../shared/modules/provider-injection (inpage.js:1:6333)
+    at s (inpage.js:1:254)
+    at e (inpage.js:1:414)
+    at inpage.js:1:431
+a @ inpage.js:1Understand this error
+in-page.js:9 Uncaught (in promise) TypeError: Cannot redefine property: isZerion
+    at Object.defineProperty (<anonymous>)
+    at Object.l (in-page.js:9:316030)
+    at Object.<anonymous> (in-page.js:1:1425)
+    at o (in-page.js:1:463)
+    at in-page.js:9:319110
+    at in-page.js:9:319121Understand this error
+content.js:2 Check phishing by URL: Passed.
+inject.chrome.3e05a493.js:1 Pocket Universe is running!
+contentScript.ts-C8mb-NdS.js:66 Razor Wallet Injected Successfully
+injected.js:1 Backpack couldn't override `window.ethereum`.
+Hxs @ injected.js:1Understand this warning
+3twitch.ts:39 Connecting to Twitch channel: ninja
+auth.privy.io/api/v1/passwordless/init:1 
+            
+            
+           Failed to load resource: the server responded with a status of 403 ()Understand this error
+3twitch.ts:39 Connecting to Twitch channel: ninja

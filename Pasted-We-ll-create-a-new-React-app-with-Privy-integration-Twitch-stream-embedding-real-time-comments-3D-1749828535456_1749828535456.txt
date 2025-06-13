@@ -1,0 +1,1615 @@
+We’ll create a new React app with Privy integration, Twitch stream embedding, real-time comments, 3D reactions, and NFT minting.
+Dependencies
+Install: npm install @privy-io/react-auth ethers html2canvas three @react-three/fiber @react-three/drei
+
+App.tsx
+typescript
+
+import React, { useState, useEffect, useRef } from "react";
+import { ethers } from "ethers";
+import { PrivyProvider, usePrivy, useWallets } from "@privy-io/react-auth";
+import html2canvas from "html2canvas";
+import { Canvas } from "@react-three/fiber";
+import { OrbitControls, Text } from "@react-three/drei";
+import "./App.css";
+
+const contractAddress = "0xYourDeployedContractAddress"; // Replace with CA
+const contractABI = []; // Replace with ABI
+
+function InnerApp() {
+const [channel, setChannel] = useState("ninja");
+const [comments, setComments] = useState([]);
+const [reactions, setReactions] = useState([]);
+const streamRef = useRef<HTMLDivElement>(null);
+const { ready, authenticated, user, sendTransaction, login } = usePrivy();
+const { wallets } = useWallets();
+const [showMintModal, setShowMintModal] = useState(false);
+
+// Handle channel change
+const handleChannelChange = async (e: React.FormEvent) => {
+e.preventDefault();
+const newChannel = (e.target as any).channel.value.toLowerCase();
+setChannel(newChannel);
+try {
+await fetch("http://localhost:3001/switch-channel", {
+method: "POST",
+headers: { "Content-Type": "application/json" },
+body: JSON.stringify({ channel: newChannel }),
+});
+(e.target as HTMLFormElement).reset();
+} catch (error) {
+console.error("Error switching channel:", error);
+}
+};
+
+// WebSocket for Twitch comments
+useEffect(() => {
+const ws = new WebSocket("ws://localhost:3002");
+ws.onmessage = (event) => {
+const data = JSON.parse(event.data);
+if (data.type === "newComment") {
+handleComment(data.comment.username, data.comment.message);
+}
+};
+return () => ws.close();
+}, [ready, authenticated]);
+
+// Handle comment
+const handleComment = async (username: string, message: string) => {
+if (!ready || !authenticated) return;
+const txRequest = {
+to: contractAddress,
+data: new ethers.utils.Interface(contractABI).encodeFunctionData("comment", [username, message]),
+chainId: 49089,
+};
+const tx = await sendTransaction(txRequest);
+setComments((prev) => [...prev, { username, message, txHash: tx.transactionHash }]);
+};
+
+// Handle reaction
+const handleReaction = async (emojiType: string) => {
+if (!ready || !authenticated) return;
+const txRequest = {
+to: contractAddress,
+data: new ethers.utils.Interface(contractABI).encodeFunctionData("react", [emojiType]),
+chainId: 49089,
+};
+const tx = await sendTransaction(txRequest);
+setReactions((prev) => [...prev, { emojiType, txHash: tx.transactionHash }]);
+animateReaction(emojiType);
+};
+
+// Handle capture and mint
+const handleCaptureMoment = async () => {
+if (!streamRef.current || !ready || !authenticated) return;
+const canvas = await html2canvas(streamRef.current, { scale: 0.5 });
+const imageData = canvas.toDataURL("image/png");
+const timestamp = Math.floor(Date.now() / 1000);
+
+
+const txRequest = {
+  to: contractAddress,
+  data: new ethers.utils.Interface(contractABI).encodeFunctionData("mintMoment", [imageData, timestamp]),
+  chainId: 49089,
+};
+const tx = await sendTransaction(txRequest);
+const provider = new ethers.providers.Web3Provider(wallets[0].provider);
+const receipt = await provider.waitForTransaction(tx.transactionHash);
+if (receipt.status === 1) alert("NFT minted! Check your wallet.");
+};
+
+// 3D reaction animation
+const animateReaction = (emojiType: string) => {
+// Placeholder for 3D animation using Three.js
+console.log(Animating ${emojiType} in 3D);
+// Implement with @react-three/fiber for full 3D flow (see CSS/App.css)
+};
+
+return (
+<div className="App">
+<header>
+<h1>Twitch Blockchain Stream</h1>
+<form onSubmit={handleChannelChange}>
+<input type="text" name="channel" placeholder="Enter Twitch channel" required />
+<button type="submit">Load Stream</button>
+</form>
+</header>
+<div className="wallet-info">
+{ready ? (authenticated ? <p>Welcome, {user?.email?.address}</p> : <button onClick={login}>Log In</button>) : <p>Loading...</p>}
+</div>
+<div className="main-content">
+<div className="stream" ref={streamRef}>
+<iframe
+src={https://player.twitch.tv/?channel=${channel}&parent=${window.location.hostname}}
+height="400px"
+width="100%"
+frameBorder="0"
+allowFullScreen
+></iframe>
+<button className="capture-button" onClick={() => setShowMintModal(true)}>
+Capture Moment
+</button>
+</div>
+<div className="sidebar">
+<h3>Comments</h3>
+{comments.map((c, i) => (
+<div key={i}>
+<p>{c.username}: {c.message}</p>
+<a href={https://testnet.monadexplorer.com/tx/${c.txHash}} target="_blank" rel="noopener noreferrer">
+View on Explorer
+</a>
+</div>
+))}
+</div>
+<div className="reactions">
+{["❤️", "😂", "😮"].map((emoji) => (
+<button key={emoji} onClick={() => handleReaction(emoji)}>{emoji}</button>
+))}
+{reactions.map((r, i) => (
+<div key={i}>
+<p>{r.emojiType}</p>
+<a href={https://testnet.monadexplorer.com/tx/${r.txHash}} target="_blank" rel="noopener noreferrer">
+View on Explorer
+</a>
+</div>
+))}
+</div>
+</div>
+{showMintModal && (
+<div className="modal">
+<h2>Mint Stream Moment</h2>
+<button onClick={handleCaptureMoment}>Mint NFT</button>
+<button onClick={() => setShowMintModal(false)}>Cancel</button>
+</div>
+)}
+<Canvas className="canvas">
+<ambientLight />
+<pointLight position={[10, 10, 10]} />
+<OrbitControls />
+<Text position={[0, 0, 0]} fontSize={1} color="white">
+3D Reactions Here
+</Text>
+</Canvas>
+</div>
+);
+}
+
+function App() {
+return (
+<PrivyProvider
+appId="your-privy-app-id" // Replace with your Privy appId
+config={{
+loginMethods: ["email", "google", "twitter"],
+embeddedWallets: { createOnLogin: "users-without-wallets", noPromptOnSignature: true },
+defaultChain: { id: "0xBFA1", name: "Monad Testnet", nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 }, rpcUrls: ["https://testnet-rpc.monad.xyz"], blockExplorers: [{ name: "Monad Explorer", url: "https://testnet.monadexplorer.com" }] },
+supportedChains: [{ id: "0xBFA1", name: "Monad Testnet", nativeCurrency: { name: "MON", symbol: "MON", decimals: 18 }, rpcUrls: ["https://testnet-rpc.monad.xyz"], blockExplorers: [{ name: "Monad Explorer", url: "https://testnet.monadexplorer.com" }] }],
+}}
+>
+<InnerApp />
+</PrivyProvider>
+);
+}
+
+export default App;
+
+App.css
+css
+
+.App {
+font-family: Arial, sans-serif;
+background: #1a1a1a;
+color: white;
+padding: 20px;
+height: 100vh;
+}
+
+header {
+text-align: center;
+margin-bottom: 20px;
+}
+
+form {
+display: flex;
+justify-content: center;
+gap: 10px;
+}
+
+input, button {
+padding: 10px;
+font-size: 1rem;
+}
+
+.main-content {
+display: flex;
+gap: 20px;
+}
+
+.stream {
+position: relative;
+width: 70%;
+}
+
+.capture-button {
+position: absolute;
+bottom: 10px;
+right: 10px;
+padding: 10px;
+background: #FF4D4F;
+color: white;
+border: none;
+cursor: pointer;
+}
+
+.sidebar {
+width: 20%;
+overflow-y: auto;
+max-height: 400px;
+}
+
+.reactions {
+width: 10%;
+}
+
+.reactions button {
+display: block;
+width: 100%;
+padding: 10px;
+margin: 5px 0;
+background: #FF4D4F;
+color: white;
+border: none;
+cursor: pointer;
+}
+
+.modal {
+position: fixed;
+top: 50%;
+left: 50%;
+transform: translate(-50%, -50%);
+background: #2a2a2a;
+padding: 20px;
+border-radius: 10px;
+z-index: 1000;
+}
+
+.modal button {
+padding: 10px 20px;
+margin: 5px;
+background: #FF4D4F;
+color: white;
+border: none;
+cursor: pointer;
+}
+
+.canvas {
+position: absolute;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+z-index: -1;
+}
+
+Notes
+Privy Setup: Users create embedded wallets with noPromptOnSignature: true for automatic transactions.
+
+Twitch Integration: Uses Twitch’s player API with dynamic channel input.
+
+3D Reactions: Placeholder with Three.js; enhance with @react-three/fiber for full 3D animation (e.g., moving emojis).
+
+NFT Minting: Captures screenshots with html2canvas and mints via mintMoment.
+
+Step 4: Backend (server.js)
+Set up a Node.js server to fetch Twitch comments via WebSocket.
+javascript
+
+const WebSocket = require("ws");
+const express = require("express");
+const app = express();
+const http = require("http").createServer(app);
+const wss = new WebSocket.Server({ server: http });
+
+app.use(express.json());
+
+app.post("/switch-channel", (req, res) => {
+const { channel } = req.body;
+// Logic to switch channel (e.g., update WebSocket connection)
+res.send("Channel switched");
+});
+
+wss.on("connection", (ws) => {
+console.log("Client connected");
+ws.on("message", (message) => {
+const data = JSON.parse(message);
+if (data.type === "join" && data.channel) {
+// Simulate Twitch comment API (replace with real API)
+setInterval(() => {
+ws.send(JSON.stringify({
+type: "newComment",
+comment: { username: "user" + Math.floor(Math.random() * 100), message: "Test comment" + Math.floor(Math.random() * 100) }
+}));
+}, 2000);
+}
+});
+});
+
+http.listen(3002, () => console.log("Server running on port 3002"));
+
+Note: Replace with Twitch’s real IRC API using a bot token for production.
+
+contract address : 0xA3592BbAd3D34Bf5197FAEcaBCA6b87552cb5676
+
+abi:
+
+[
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "to",
+"type": "address"
+},
+{
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+}
+],
+"name": "approve",
+"outputs": [],
+"stateMutability": "nonpayable",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "string",
+"name": "_username",
+"type": "string"
+},
+{
+"internalType": "string",
+"name": "_message",
+"type": "string"
+}
+],
+"name": "comment",
+"outputs": [],
+"stateMutability": "nonpayable",
+"type": "function"
+},
+{
+"inputs": [],
+"stateMutability": "nonpayable",
+"type": "constructor"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "sender",
+"type": "address"
+},
+{
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+},
+{
+"internalType": "address",
+"name": "owner",
+"type": "address"
+}
+],
+"name": "ERC721IncorrectOwner",
+"type": "error"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "operator",
+"type": "address"
+},
+{
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+}
+],
+"name": "ERC721InsufficientApproval",
+"type": "error"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "approver",
+"type": "address"
+}
+],
+"name": "ERC721InvalidApprover",
+"type": "error"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "operator",
+"type": "address"
+}
+],
+"name": "ERC721InvalidOperator",
+"type": "error"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "owner",
+"type": "address"
+}
+],
+"name": "ERC721InvalidOwner",
+"type": "error"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "receiver",
+"type": "address"
+}
+],
+"name": "ERC721InvalidReceiver",
+"type": "error"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "sender",
+"type": "address"
+}
+],
+"name": "ERC721InvalidSender",
+"type": "error"
+},
+{
+"inputs": [
+{
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+}
+],
+"name": "ERC721NonexistentToken",
+"type": "error"
+},
+{
+"anonymous": false,
+"inputs": [
+{
+"indexed": true,
+"internalType": "address",
+"name": "owner",
+"type": "address"
+},
+{
+"indexed": true,
+"internalType": "address",
+"name": "approved",
+"type": "address"
+},
+{
+"indexed": true,
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+}
+],
+"name": "Approval",
+"type": "event"
+},
+{
+"anonymous": false,
+"inputs": [
+{
+"indexed": true,
+"internalType": "address",
+"name": "owner",
+"type": "address"
+},
+{
+"indexed": true,
+"internalType": "address",
+"name": "operator",
+"type": "address"
+},
+{
+"indexed": false,
+"internalType": "bool",
+"name": "approved",
+"type": "bool"
+}
+],
+"name": "ApprovalForAll",
+"type": "event"
+},
+{
+"anonymous": false,
+"inputs": [
+{
+"indexed": true,
+"internalType": "address",
+"name": "user",
+"type": "address"
+},
+{
+"indexed": false,
+"internalType": "string",
+"name": "username",
+"type": "string"
+},
+{
+"indexed": false,
+"internalType": "string",
+"name": "message",
+"type": "string"
+},
+{
+"indexed": false,
+"internalType": "uint256",
+"name": "timestamp",
+"type": "uint256"
+},
+{
+"indexed": false,
+"internalType": "bytes32",
+"name": "txHash",
+"type": "bytes32"
+}
+],
+"name": "CommentPosted",
+"type": "event"
+},
+{
+"inputs": [
+{
+"internalType": "string",
+"name": "_imageData",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "_timestamp",
+"type": "uint256"
+}
+],
+"name": "mintMoment",
+"outputs": [],
+"stateMutability": "nonpayable",
+"type": "function"
+},
+{
+"anonymous": false,
+"inputs": [
+{
+"indexed": true,
+"internalType": "address",
+"name": "user",
+"type": "address"
+},
+{
+"indexed": false,
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+},
+{
+"indexed": false,
+"internalType": "string",
+"name": "imageData",
+"type": "string"
+},
+{
+"indexed": false,
+"internalType": "uint256",
+"name": "timestamp",
+"type": "uint256"
+},
+{
+"indexed": false,
+"internalType": "bytes32",
+"name": "txHash",
+"type": "bytes32"
+}
+],
+"name": "MomentMinted",
+"type": "event"
+},
+{
+"inputs": [
+{
+"internalType": "string",
+"name": "_emojiType",
+"type": "string"
+}
+],
+"name": "react",
+"outputs": [],
+"stateMutability": "nonpayable",
+"type": "function"
+},
+{
+"anonymous": false,
+"inputs": [
+{
+"indexed": true,
+"internalType": "address",
+"name": "user",
+"type": "address"
+},
+{
+"indexed": false,
+"internalType": "string",
+"name": "emojiType",
+"type": "string"
+},
+{
+"indexed": false,
+"internalType": "uint256",
+"name": "timestamp",
+"type": "uint256"
+},
+{
+"indexed": false,
+"internalType": "bytes32",
+"name": "txHash",
+"type": "bytes32"
+}
+],
+"name": "ReactionPosted",
+"type": "event"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "from",
+"type": "address"
+},
+{
+"internalType": "address",
+"name": "to",
+"type": "address"
+},
+{
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+}
+],
+"name": "safeTransferFrom",
+"outputs": [],
+"stateMutability": "nonpayable",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "from",
+"type": "address"
+},
+{
+"internalType": "address",
+"name": "to",
+"type": "address"
+},
+{
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+},
+{
+"internalType": "bytes",
+"name": "data",
+"type": "bytes"
+}
+],
+"name": "safeTransferFrom",
+"outputs": [],
+"stateMutability": "nonpayable",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "operator",
+"type": "address"
+},
+{
+"internalType": "bool",
+"name": "approved",
+"type": "bool"
+}
+],
+"name": "setApprovalForAll",
+"outputs": [],
+"stateMutability": "nonpayable",
+"type": "function"
+},
+{
+"anonymous": false,
+"inputs": [
+{
+"indexed": true,
+"internalType": "address",
+"name": "from",
+"type": "address"
+},
+{
+"indexed": true,
+"internalType": "address",
+"name": "to",
+"type": "address"
+},
+{
+"indexed": true,
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+}
+],
+"name": "Transfer",
+"type": "event"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "from",
+"type": "address"
+},
+{
+"internalType": "address",
+"name": "to",
+"type": "address"
+},
+{
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+}
+],
+"name": "transferFrom",
+"outputs": [],
+"stateMutability": "nonpayable",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "owner",
+"type": "address"
+}
+],
+"name": "balanceOf",
+"outputs": [
+{
+"internalType": "uint256",
+"name": "",
+"type": "uint256"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "uint256",
+"name": "",
+"type": "uint256"
+}
+],
+"name": "comments",
+"outputs": [
+{
+"internalType": "address",
+"name": "user",
+"type": "address"
+},
+{
+"internalType": "string",
+"name": "username",
+"type": "string"
+},
+{
+"internalType": "string",
+"name": "message",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "timestamp",
+"type": "uint256"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+}
+],
+"name": "getApproved",
+"outputs": [
+{
+"internalType": "address",
+"name": "",
+"type": "address"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [],
+"name": "getComments",
+"outputs": [
+{
+"components": [
+{
+"internalType": "address",
+"name": "user",
+"type": "address"
+},
+{
+"internalType": "string",
+"name": "username",
+"type": "string"
+},
+{
+"internalType": "string",
+"name": "message",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "timestamp",
+"type": "uint256"
+}
+],
+"internalType": "struct TwitchStreamInteractions.Comment[]",
+"name": "",
+"type": "tuple[]"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [],
+"name": "getReactions",
+"outputs": [
+{
+"components": [
+{
+"internalType": "address",
+"name": "user",
+"type": "address"
+},
+{
+"internalType": "string",
+"name": "emojiType",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "timestamp",
+"type": "uint256"
+}
+],
+"internalType": "struct TwitchStreamInteractions.Reaction[]",
+"name": "",
+"type": "tuple[]"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "_user",
+"type": "address"
+}
+],
+"name": "getUserComments",
+"outputs": [
+{
+"components": [
+{
+"internalType": "address",
+"name": "user",
+"type": "address"
+},
+{
+"internalType": "string",
+"name": "username",
+"type": "string"
+},
+{
+"internalType": "string",
+"name": "message",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "timestamp",
+"type": "uint256"
+}
+],
+"internalType": "struct TwitchStreamInteractions.Comment[]",
+"name": "",
+"type": "tuple[]"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "_user",
+"type": "address"
+}
+],
+"name": "getUserReactions",
+"outputs": [
+{
+"components": [
+{
+"internalType": "address",
+"name": "user",
+"type": "address"
+},
+{
+"internalType": "string",
+"name": "emojiType",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "timestamp",
+"type": "uint256"
+}
+],
+"internalType": "struct TwitchStreamInteractions.Reaction[]",
+"name": "",
+"type": "tuple[]"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "owner",
+"type": "address"
+},
+{
+"internalType": "address",
+"name": "operator",
+"type": "address"
+}
+],
+"name": "isApprovedForAll",
+"outputs": [
+{
+"internalType": "bool",
+"name": "",
+"type": "bool"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [],
+"name": "name",
+"outputs": [
+{
+"internalType": "string",
+"name": "",
+"type": "string"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+}
+],
+"name": "ownerOf",
+"outputs": [
+{
+"internalType": "address",
+"name": "",
+"type": "address"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "uint256",
+"name": "",
+"type": "uint256"
+}
+],
+"name": "reactions",
+"outputs": [
+{
+"internalType": "address",
+"name": "user",
+"type": "address"
+},
+{
+"internalType": "string",
+"name": "emojiType",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "timestamp",
+"type": "uint256"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "uint256",
+"name": "",
+"type": "uint256"
+}
+],
+"name": "streamMoments",
+"outputs": [
+{
+"internalType": "string",
+"name": "imageData",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "timestamp",
+"type": "uint256"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "bytes4",
+"name": "interfaceId",
+"type": "bytes4"
+}
+],
+"name": "supportsInterface",
+"outputs": [
+{
+"internalType": "bool",
+"name": "",
+"type": "bool"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [],
+"name": "symbol",
+"outputs": [
+{
+"internalType": "string",
+"name": "",
+"type": "string"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "uint256",
+"name": "tokenId",
+"type": "uint256"
+}
+],
+"name": "tokenURI",
+"outputs": [
+{
+"internalType": "string",
+"name": "",
+"type": "string"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "",
+"type": "address"
+},
+{
+"internalType": "uint256",
+"name": "",
+"type": "uint256"
+}
+],
+"name": "userComments",
+"outputs": [
+{
+"internalType": "address",
+"name": "user",
+"type": "address"
+},
+{
+"internalType": "string",
+"name": "username",
+"type": "string"
+},
+{
+"internalType": "string",
+"name": "message",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "timestamp",
+"type": "uint256"
+}
+],
+"stateMutability": "view",
+"type": "function"
+},
+{
+"inputs": [
+{
+"internalType": "address",
+"name": "",
+"type": "address"
+},
+{
+"internalType": "uint256",
+"name": "",
+"type": "uint256"
+}
+],
+"name": "userReactions",
+"outputs": [
+{
+"internalType": "address",
+"name": "user",
+"type": "address"
+},
+{
+"internalType": "string",
+"name": "emojiType",
+"type": "string"
+},
+{
+"internalType": "uint256",
+"name": "timestamp",
+"type": "uint256"
+}
+],
+"stateMutability": "view",
+"type": "function"
+}
+]
+
+bytecode:
+
+608060405234801561000f575f5ffd5b506040518060400160405280601081526020017f54776974636853747265616d4e465473000000000000000000000000000000008152506040518060400160405280600381526020017f54534e0000000000000000000000000000000000000000000000000000000000815250815f908161008a91906102df565b50806001908161009a91906102df565b5050506103ae565b5f81519050919050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b7f4e487b71000000000000000000000000000000000000000000000000000000005f52602260045260245ffd5b5f600282049050600182168061011d57607f821691505b6020821081036101305761012f6100d9565b5b50919050565b5f819050815f5260205f209050919050565b5f6020601f8301049050919050565b5f82821b905092915050565b5f600883026101927fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff82610157565b61019c8683610157565b95508019841693508086168417925050509392505050565b5f819050919050565b5f819050919050565b5f6101e06101db6101d6846101b4565b6101bd565b6101b4565b9050919050565b5f819050919050565b6101f9836101c6565b61020d610205826101e7565b848454610163565b825550505050565b5f5f905090565b610224610215565b61022f8184846101f0565b505050565b5b81811015610252576102475f8261021c565b600181019050610235565b5050565b601f8211156102975761026881610136565b61027184610148565b81016020851015610280578190505b61029461028c85610148565b830182610234565b50505b505050565b5f82821c905092915050565b5f6102b75f198460080261029c565b1980831691505092915050565b5f6102cf83836102a8565b9150826002028217905092915050565b6102e8826100a2565b67ffffffffffffffff811115610301576103006100ac565b5b61030b8254610106565b610316828285610256565b5f60209050601f831160018114610347575f8415610335578287015190505b61033f85826102c4565b8655506103a6565b601f19841661035586610136565b5f5b8281101561037c57848901518255600182019150602085019450602081019050610357565b868310156103995784890151610395601f8916826102a8565b8355505b6001600288020188555050505b505050505050565b613c9e806103bb5f395ff3fe608060405234801561000f575f5ffd5b5060043610610171575f3560e01c806370a08231116100dc578063a22cb46511610095578063c87b56dd1161006f578063c87b56dd1461049b578063d6dfe6e0146104cb578063e985e9c5146104fc578063ec9d6ac81461052c57610171565b8063a22cb46514610431578063b88d4fde1461044d578063c0d2c8a11461046957610171565b806370a082311461032d57806370f808281461035d578063791294711461038f5780638ebb4c15146103c257806391f3410c146103f557806395d89b411461041357610171565b806323b872dd1161012e57806323b872dd146102495780632b3c6e221461026557806342842e0e1461029557806343d239bd146102b157806362dab0ac146102cd5780636352211e146102fd57610171565b806301ffc9a7146101755780630472f418146101a557806306fdde03146101c3578063081812fc146101e1578063095ea7b31461021157806310c6b2101461022d575b5f5ffd5b61018f600480360381019061018a9190612a43565b610548565b60405161019c9190612a88565b60405180910390f35b6101ad610629565b6040516101ba9190612c70565b60405180910390f35b6101cb610773565b6040516101d89190612cd8565b60405180910390f35b6101fb60048036038101906101f69190612d22565b610802565b6040516102089190612d5c565b60405180910390f35b61022b60048036038101906102269190612d9f565b61081d565b005b61024760048036038101906102429190612f09565b610833565b005b610263600480360381019061025e9190612f63565b610987565b005b61027f600480360381019061027a9190612fb3565b610a86565b60405161028c9190613100565b60405180910390f35b6102af60048036038101906102aa9190612f63565b610c9d565b005b6102cb60048036038101906102c69190613120565b610cbc565b005b6102e760048036038101906102e29190612fb3565b610f67565b6040516102f49190612c70565b60405180910390f35b61031760048036038101906103129190612d22565b6110ee565b6040516103249190612d5c565b60405180910390f35b61034760048036038101906103429190612fb3565b6110ff565b60405161035491906131a5565b60405180910390f35b61037760048036038101906103729190612d22565b6111b5565b604051610386939291906131be565b60405180910390f35b6103a960048036038101906103a49190612d9f565b61128f565b6040516103b994939291906131fa565b60405180910390f35b6103dc60048036038101906103d79190612d22565b611400565b6040516103ec94939291906131fa565b60405180910390f35b6103fd611566565b60405161040a9190613100565b60405180910390f35b61041b611740565b6040516104289190612cd8565b60405180910390f35b61044b60048036038101906104469190613275565b6117d0565b005b61046760048036038101906104629190613351565b6117e6565b005b610483600480360381019061047e9190612d9f565b61180b565b604051610492939291906131be565b60405180910390f35b6104b560048036038101906104b09190612d22565b6118f0565b6040516104c29190612cd8565b60405180910390f35b6104e560048036038101906104e09190612d22565b611956565b6040516104f39291906133d1565b60405180910390f35b610516600480360381019061051191906133ff565b6119fc565b6040516105239190612a88565b60405180910390f35b6105466004803603810190610541919061343d565b611a8a565b005b5f7f80ac58cd000000000000000000000000000000000000000000000000000000007bffffffffffffffffffffffffffffffffffffffffffffffffffffffff1916827bffffffffffffffffffffffffffffffffffffffffffffffffffffffff1916148061061257507f5b5e139f000000000000000000000000000000000000000000000000000000007bffffffffffffffffffffffffffffffffffffffffffffffffffffffff1916827bffffffffffffffffffffffffffffffffffffffffffffffffffffffff1916145b80610622575061062182611cbd565b5b9050919050565b60606009805480602002602001604051908101604052809291908181526020015f905b8282101561076a578382905f5260205f2090600302016040518060600160405290815f82015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020016001820180546106d1906134b1565b80601f01602080910402602001604051908101604052809291908181526020018280546106fd906134b1565b80156107485780601f1061071f57610100808354040283529160200191610748565b820191905f5260205f20905b81548152906001019060200180831161072b57829003601f168201915b505050505081526020016002820154815250508152602001906001019061064c565b50505050905090565b60605f8054610781906134b1565b80601f01602080910402602001604051908101604052809291908181526020018280546107ad906134b1565b80156107f85780601f106107cf576101008083540402835291602001916107f8565b820191905f5260205f20905b8154815290600101906020018083116107db57829003601f168201915b5050505050905090565b5f61080c82611d26565b5061081682611dac565b9050919050565b61082f828261082a611de5565b611dec565b5050565b5f825111610876576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040161086d9061352b565b60405180910390fd5b428111156108b9576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004016108b090613593565b60405180910390fd5b5f6108c46006611dfe565b90506108d03382611e0a565b604051806040016040528084815260200183815250600b5f8381526020019081526020015f205f820151815f0190816109099190613751565b50602082015181600101559050506109216006611efd565b3373ffffffffffffffffffffffffffffffffffffffff167fd48529cc3d869c909c532325cfb47dc07b3fba4a7e516a658f22d0cb6630ad73828585600143610969919061384d565b4060405161097a9493929190613898565b60405180910390a2505050565b5f73ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff16036109f7575f6040517f64a0ae920000000000000000000000000000000000000000000000000000000081526004016109ee9190612d5c565b60405180910390fd5b5f610a0a8383610a05611de5565b611f11565b90508373ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1614610a80578382826040517f64283d7b000000000000000000000000000000000000000000000000000000008152600401610a77939291906138e2565b60405180910390fd5b50505050565b606060085f8373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f20805480602002602001604051908101604052809291908181526020015f905b82821015610c92578382905f5260205f2090600402016040518060800160405290815f82015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff168152602001600182018054610b69906134b1565b80601f0160208091040260200160405190810160405280929190818152602001828054610b95906134b1565b8015610be05780601f10610bb757610100808354040283529160200191610be0565b820191905f5260205f20905b815481529060010190602001808311610bc357829003601f168201915b50505050508152602001600282018054610bf9906134b1565b80601f0160208091040260200160405190810160405280929190818152602001828054610c25906134b1565b8015610c705780601f10610c4757610100808354040283529160200191610c70565b820191905f5260205f20905b815481529060010190602001808311610c5357829003601f168201915b5050505050815260200160038201548152505081526020019060010190610ae4565b505050509050919050565b610cb783838360405180602001604052805f8152506117e6565b505050565b5f825111610cff576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610cf690613961565b60405180910390fd5b5f815111610d42576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401610d39906139c9565b60405180910390fd5b5f60405180608001604052803373ffffffffffffffffffffffffffffffffffffffff16815260200184815260200183815260200142815250905060085f3373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f2081908060018154018082558091505060019003905f5260205f2090600402015f909190919091505f820151815f015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506020820151816001019081610e399190613751565b506040820151816002019081610e4f9190613751565b50606082015181600301555050600781908060018154018082558091505060019003905f5260205f2090600402015f909190919091505f820151815f015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506020820151816001019081610ede9190613751565b506040820151816002019081610ef49190613751565b506060820151816003015550503373ffffffffffffffffffffffffffffffffffffffff167f42abc468e1b219786f360f19178ea354cfeb93f649ad0ce59a1b22bb76f016ba848442600143610f49919061384d565b40604051610f5a94939291906139e7565b60405180910390a2505050565b6060600a5f8373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f20805480602002602001604051908101604052809291908181526020015f905b828210156110e3578382905f5260205f2090600302016040518060600160405290815f82015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200160018201805461104a906134b1565b80601f0160208091040260200160405190810160405280929190818152602001828054611076906134b1565b80156110c15780601f10611098576101008083540402835291602001916110c1565b820191905f5260205f20905b8154815290600101906020018083116110a457829003601f168201915b5050505050815260200160028201548152505081526020019060010190610fc5565b505050509050919050565b5f6110f882611d26565b9050919050565b5f5f73ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff1603611170575f6040517f89c62b640000000000000000000000000000000000000000000000000000000081526004016111679190612d5c565b60405180910390fd5b60035f8373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f20549050919050565b600981815481106111c4575f80fd5b905f5260205f2090600302015f91509050805f015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690806001018054611208906134b1565b80601f0160208091040260200160405190810160405280929190818152602001828054611234906134b1565b801561127f5780601f106112565761010080835404028352916020019161127f565b820191905f5260205f20905b81548152906001019060200180831161126257829003601f168201915b5050505050908060020154905083565b6008602052815f5260405f2081815481106112a8575f80fd5b905f5260205f2090600402015f9150915050805f015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff16908060010180546112ed906134b1565b80601f0160208091040260200160405190810160405280929190818152602001828054611319906134b1565b80156113645780601f1061133b57610100808354040283529160200191611364565b820191905f5260205f20905b81548152906001019060200180831161134757829003601f168201915b505050505090806002018054611379906134b1565b80601f01602080910402602001604051908101604052809291908181526020018280546113a5906134b1565b80156113f05780601f106113c7576101008083540402835291602001916113f0565b820191905f5260205f20905b8154815290600101906020018083116113d357829003601f168201915b5050505050908060030154905084565b6007818154811061140f575f80fd5b905f5260205f2090600402015f91509050805f015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690806001018054611453906134b1565b80601f016020809104026020016040519081016040528092919081815260200182805461147f906134b1565b80156114ca5780601f106114a1576101008083540402835291602001916114ca565b820191905f5260205f20905b8154815290600101906020018083116114ad57829003601f168201915b5050505050908060020180546114df906134b1565b80601f016020809104026020016040519081016040528092919081815260200182805461150b906134b1565b80156115565780601f1061152d57610100808354040283529160200191611556565b820191905f5260205f20905b81548152906001019060200180831161153957829003601f168201915b5050505050908060030154905084565b60606007805480602002602001604051908101604052809291908181526020015f905b82821015611737578382905f5260205f2090600402016040518060800160405290815f82015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff16815260200160018201805461160e906134b1565b80601f016020809104026020016040519081016040528092919081815260200182805461163a906134b1565b80156116855780601f1061165c57610100808354040283529160200191611685565b820191905f5260205f20905b81548152906001019060200180831161166857829003601f168201915b5050505050815260200160028201805461169e906134b1565b80601f01602080910402602001604051908101604052809291908181526020018280546116ca906134b1565b80156117155780601f106116ec57610100808354040283529160200191611715565b820191905f5260205f20905b8154815290600101906020018083116116f857829003601f168201915b5050505050815260200160038201548152505081526020019060010190611589565b50505050905090565b60606001805461174f906134b1565b80601f016020809104026020016040519081016040528092919081815260200182805461177b906134b1565b80156117c65780601f1061179d576101008083540402835291602001916117c6565b820191905f5260205f20905b8154815290600101906020018083116117a957829003601f168201915b5050505050905090565b6117e26117db611de5565b838361211c565b5050565b6117f1848484610987565b6118056117fc611de5565b85858585612285565b50505050565b600a602052815f5260405f208181548110611824575f80fd5b905f5260205f2090600302015f9150915050805f015f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff1690806001018054611869906134b1565b80601f0160208091040260200160405190810160405280929190818152602001828054611895906134b1565b80156118e05780601f106118b7576101008083540402835291602001916118e0565b820191905f5260205f20905b8154815290600101906020018083116118c357829003601f168201915b5050505050908060020154905083565b60606118fb82611d26565b505f611905612431565b90505f8151116119235760405180602001604052805f81525061194e565b8061192d84612447565b60405160200161193e929190613a72565b6040516020818303038152906040525b915050919050565b600b602052805f5260405f205f91509050805f018054611975906134b1565b80601f01602080910402602001604051908101604052809291908181526020018280546119a1906134b1565b80156119ec5780601f106119c3576101008083540402835291602001916119ec565b820191905f5260205f20905b8154815290600101906020018083116119cf57829003601f168201915b5050505050908060010154905082565b5f60055f8473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f205f8373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f205f9054906101000a900460ff16905092915050565b5f815111611acd576040517f08c379a0000000000000000000000000000000000000000000000000000000008152600401611ac490613adf565b60405180910390fd5b5f60405180606001604052803373ffffffffffffffffffffffffffffffffffffffff168152602001838152602001428152509050600a5f3373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f2081908060018154018082558091505060019003905f5260205f2090600302015f909190919091505f820151815f015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506020820151816001019081611bbe9190613751565b50604082015181600201555050600981908060018154018082558091505060019003905f5260205f2090600302015f909190919091505f820151815f015f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055506020820151816001019081611c4d9190613751565b506040820151816002015550503373ffffffffffffffffffffffffffffffffffffffff167fd8aa2a9f681af940d2de90ca1507fde13d4a408e518d1a3a0f70e2c0f8b870088342600143611ca1919061384d565b40604051611cb193929190613afd565b60405180910390a25050565b5f7f01ffc9a7000000000000000000000000000000000000000000000000000000007bffffffffffffffffffffffffffffffffffffffffffffffffffffffff1916827bffffffffffffffffffffffffffffffffffffffffffffffffffffffff1916149050919050565b5f5f611d3183612511565b90505f73ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1603611da357826040517f7e273289000000000000000000000000000000000000000000000000000000008152600401611d9a91906131a5565b60405180910390fd5b80915050919050565b5f60045f8381526020019081526020015f205f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050919050565b5f33905090565b611df9838383600161254a565b505050565b5f815f01549050919050565b5f73ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff1603611e7a575f6040517f64a0ae92000000000000000000000000000000000000000000000000000000008152600401611e719190612d5c565b60405180910390fd5b5f611e8683835f611f11565b90505f73ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1614611ef8575f6040517f73c6ac6e000000000000000000000000000000000000000000000000000000008152600401611eef9190612d5c565b60405180910390fd5b505050565b6001815f015f828254019250508190555050565b5f5f611f1c84612511565b90505f73ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff1614611f5d57611f5c818486612709565b5b5f73ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1614611fe857611f9c5f855f5f61254a565b600160035f8373ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f205f82825403925050819055505b5f73ffffffffffffffffffffffffffffffffffffffff168573ffffffffffffffffffffffffffffffffffffffff161461206757600160035f8773ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f205f82825401925050819055505b8460025f8681526020019081526020015f205f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550838573ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff167fddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef60405160405180910390a4809150509392505050565b5f73ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff160361218c57816040517f5b08ba180000000000000000000000000000000000000000000000000000000081526004016121839190612d5c565b60405180910390fd5b8060055f8573ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f205f8473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1681526020019081526020015f205f6101000a81548160ff0219169083151502179055508173ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff167f17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31836040516122789190612a88565b60405180910390a3505050565b5f8373ffffffffffffffffffffffffffffffffffffffff163b111561242a578273ffffffffffffffffffffffffffffffffffffffff1663150b7a02868685856040518563ffffffff1660e01b81526004016122e39493929190613b8b565b6020604051808303815f875af192505050801561231e57506040513d601f19601f8201168201806040525081019061231b9190613be9565b60015b61239f573d805f811461234c576040519150601f19603f3d011682016040523d82523d5f602084013e612351565b606091505b505f81510361239757836040517f64a0ae9200000000000000000000000000000000000000000000000000000000815260040161238e9190612d5c565b60405180910390fd5b805181602001fd5b63150b7a0260e01b7bffffffffffffffffffffffffffffffffffffffffffffffffffffffff1916817bffffffffffffffffffffffffffffffffffffffffffffffffffffffff19161461242857836040517f64a0ae9200000000000000000000000000000000000000000000000000000000815260040161241f9190612d5c565b60405180910390fd5b505b5050505050565b606060405180602001604052805f815250905090565b60605f6001612455846127cc565b0190505f8167ffffffffffffffff81111561247357612472612de5565b5b6040519080825280601f01601f1916602001820160405280156124a55781602001600182028036833780820191505090505b5090505f82602001820190505b600115612506578080600190039150507f3031323334353637383961626364656600000000000000000000000000000000600a86061a8153600a85816124fb576124fa613c14565b5b0494505f85036124b2575b819350505050919050565b5f60025f8381526020019081526020015f205f9054906101000a900473ffffffffffffffffffffffffffffffffffffffff169050919050565b808061258257505f73ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff1614155b156126b4575f61259184611d26565b90505f73ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff16141580156125fb57508273ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1614155b801561260e575061260c81846119fc565b155b1561265057826040517fa9fbf51f0000000000000000000000000000000000000000000000000000000081526004016126479190612d5c565b60405180910390fd5b81156126b257838573ffffffffffffffffffffffffffffffffffffffff168273ffffffffffffffffffffffffffffffffffffffff167f8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b92560405160405180910390a45b505b8360045f8581526020019081526020015f205f6101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555050505050565b61271483838361291d565b6127c7575f73ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff160361278857806040517f7e27328900000000000000000000000000000000000000000000000000000000815260040161277f91906131a5565b60405180910390fd5b81816040517f177e802f0000000000000000000000000000000000000000000000000000000081526004016127be929190613c41565b60405180910390fd5b505050565b5f5f5f90507a184f03e93ff9f4daa797ed6e38ed64bf6a1f0100000000000000008310612828577a184f03e93ff9f4daa797ed6e38ed64bf6a1f010000000000000000838161281e5761281d613c14565b5b0492506040810190505b6d04ee2d6d415b85acef81000000008310612865576d04ee2d6d415b85acef8100000000838161285b5761285a613c14565b5b0492506020810190505b662386f26fc10000831061289457662386f26fc10000838161288a57612889613c14565b5b0492506010810190505b6305f5e10083106128bd576305f5e10083816128b3576128b2613c14565b5b0492506008810190505b61271083106128e25761271083816128d8576128d7613c14565b5b0492506004810190505b6064831061290557606483816128fb576128fa613c14565b5b0492506002810190505b600a8310612914576001810190505b80915050919050565b5f5f73ffffffffffffffffffffffffffffffffffffffff168373ffffffffffffffffffffffffffffffffffffffff16141580156129d457508273ffffffffffffffffffffffffffffffffffffffff168473ffffffffffffffffffffffffffffffffffffffff161480612995575061299484846119fc565b5b806129d357508273ffffffffffffffffffffffffffffffffffffffff166129bb83611dac565b73ffffffffffffffffffffffffffffffffffffffff16145b5b90509392505050565b5f604051905090565b5f5ffd5b5f5ffd5b5f7fffffffff0000000000000000000000000000000000000000000000000000000082169050919050565b612a22816129ee565b8114612a2c575f5ffd5b50565b5f81359050612a3d81612a19565b92915050565b5f60208284031215612a5857612a576129e6565b5b5f612a6584828501612a2f565b91505092915050565b5f8115159050919050565b612a8281612a6e565b82525050565b5f602082019050612a9b5f830184612a79565b92915050565b5f81519050919050565b5f82825260208201905092915050565b5f819050602082019050919050565b5f73ffffffffffffffffffffffffffffffffffffffff82169050919050565b5f612af382612aca565b9050919050565b612b0381612ae9565b82525050565b5f81519050919050565b5f82825260208201905092915050565b8281835e5f83830152505050565b5f601f19601f8301169050919050565b5f612b4b82612b09565b612b558185612b13565b9350612b65818560208601612b23565b612b6e81612b31565b840191505092915050565b5f819050919050565b612b8b81612b79565b82525050565b5f606083015f830151612ba65f860182612afa565b5060208301518482036020860152612bbe8282612b41565b9150506040830151612bd36040860182612b82565b508091505092915050565b5f612be98383612b91565b905092915050565b5f602082019050919050565b5f612c0782612aa1565b612c118185612aab565b935083602082028501612c2385612abb565b805f5b85811015612c5e5784840389528151612c3f8582612bde565b9450612c4a83612bf1565b925060208a01995050600181019050612c26565b50829750879550505050505092915050565b5f6020820190508181035f830152612c888184612bfd565b905092915050565b5f82825260208201905092915050565b5f612caa82612b09565b612cb48185612c90565b9350612cc4818560208601612b23565b612ccd81612b31565b840191505092915050565b5f6020820190508181035f830152612cf08184612ca0565b905092915050565b612d0181612b79565b8114612d0b575f5ffd5b50565b5f81359050612d1c81612cf8565b92915050565b5f60208284031215612d3757612d366129e6565b5b5f612d4484828501612d0e565b91505092915050565b612d5681612ae9565b82525050565b5f602082019050612d6f5f830184612d4d565b92915050565b612d7e81612ae9565b8114612d88575f5ffd5b50565b5f81359050612d9981612d75565b92915050565b5f5f60408385031215612db557612db46129e6565b5b5f612dc285828601612d8b565b9250506020612dd385828601612d0e565b9150509250929050565b5f5ffd5b5f5ffd5b7f4e487b71000000000000000000000000000000000000000000000000000000005f52604160045260245ffd5b612e1b82612b31565b810181811067ffffffffffffffff82111715612e3a57612e39612de5565b5b80604052505050565b5f612e4c6129dd565b9050612e588282612e12565b919050565b5f67ffffffffffffffff821115612e7757612e76612de5565b5b612e8082612b31565b9050602081019050919050565b828183375f83830152505050565b5f612ead612ea884612e5d565b612e43565b905082815260208101848484011115612ec957612ec8612de1565b5b612ed4848285612e8d565b509392505050565b5f82601f830112612ef057612eef612ddd565b5b8135612f00848260208601612e9b565b91505092915050565b5f5f60408385031215612f1f57612f1e6129e6565b5b5f83013567ffffffffffffffff811115612f3c57612f3b6129ea565b5b612f4885828601612edc565b9250506020612f5985828601612d0e565b9150509250929050565b5f5f5f60608486031215612f7a57612f796129e6565b5b5f612f8786828701612d8b565b9350506020612f9886828701612d8b565b9250506040612fa986828701612d0e565b9150509250925092565b5f60208284031215612fc857612fc76129e6565b5b5f612fd584828501612d8b565b91505092915050565b5f81519050919050565b5f82825260208201905092915050565b5f819050602082019050919050565b5f608083015f83015161301c5f860182612afa565b50602083015184820360208601526130348282612b41565b9150506040830151848203604086015261304e8282612b41565b91505060608301516130636060860182612b82565b508091505092915050565b5f6130798383613007565b905092915050565b5f602082019050919050565b5f61309782612fde565b6130a18185612fe8565b9350836020820285016130b385612ff8565b805f5b858110156130ee57848403895281516130cf858261306e565b94506130da83613081565b925060208a019950506001810190506130b6565b50829750879550505050505092915050565b5f6020820190508181035f830152613118818461308d565b905092915050565b5f5f60408385031215613136576131356129e6565b5b5f83013567ffffffffffffffff811115613153576131526129ea565b5b61315f85828601612edc565b925050602083013567ffffffffffffffff8111156131805761317f6129ea565b5b61318c85828601612edc565b9150509250929050565b61319f81612b79565b82525050565b5f6020820190506131b85f830184613196565b92915050565b5f6060820190506131d15f830186612d4d565b81810360208301526131e38185612ca0565b90506131f26040830184613196565b949350505050565b5f60808201905061320d5f830187612d4d565b818103602083015261321f8186612ca0565b905081810360408301526132338185612ca0565b90506132426060830184613196565b95945050505050565b61325481612a6e565b811461325e575f5ffd5b50565b5f8135905061326f8161324b565b92915050565b5f5f6040838503121561328b5761328a6129e6565b5b5f61329885828601612d8b565b92505060206132a985828601613261565b9150509250929050565b5f67ffffffffffffffff8211156132cd576132cc612de5565b5b6132d682612b31565b9050602081019050919050565b5f6132f56132f0846132b3565b612e43565b90508281526020810184848401111561331157613310612de1565b5b61331c848285612e8d565b509392505050565b5f82601f83011261333857613337612ddd565b5b81356133488482602086016132e3565b91505092915050565b5f5f5f5f60808587031215613369576133686129e6565b5b5f61337687828801612d8b565b945050602061338787828801612d8b565b935050604061339887828801612d0e565b925050606085013567ffffffffffffffff8111156133b9576133b86129ea565b5b6133c587828801613324565b91505092959194509250565b5f6040820190508181035f8301526133e98185612ca0565b90506133f86020830184613196565b9392505050565b5f5f60408385031215613415576134146129e6565b5b5f61342285828601612d8b565b925050602061343385828601612d8b565b9150509250929050565b5f60208284031215613452576134516129e6565b5b5f82013567ffffffffffffffff81111561346f5761346e6129ea565b5b61347b84828501612edc565b91505092915050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52602260045260245ffd5b5f60028204905060018216806134c857607f821691505b6020821081036134db576134da613484565b5b50919050565b7f496d61676520646174612063616e6e6f7420626520656d7074790000000000005f82015250565b5f613515601a83612c90565b9150613520826134e1565b602082019050919050565b5f6020820190508181035f83015261354281613509565b9050919050565b7f496e76616c69642074696d657374616d700000000000000000000000000000005f82015250565b5f61357d601183612c90565b915061358882613549565b602082019050919050565b5f6020820190508181035f8301526135aa81613571565b9050919050565b5f819050815f5260205f209050919050565b5f6020601f8301049050919050565b5f82821b905092915050565b5f6008830261360d7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff826135d2565b61361786836135d2565b95508019841693508086168417925050509392505050565b5f819050919050565b5f61365261364d61364884612b79565b61362f565b612b79565b9050919050565b5f819050919050565b61366b83613638565b61367f61367782613659565b8484546135de565b825550505050565b5f5f905090565b613696613687565b6136a1818484613662565b505050565b5b818110156136c4576136b95f8261368e565b6001810190506136a7565b5050565b601f821115613709576136da816135b1565b6136e3846135c3565b810160208510156136f2578190505b6137066136fe856135c3565b8301826136a6565b50505b505050565b5f82821c905092915050565b5f6137295f198460080261370e565b1980831691505092915050565b5f613741838361371a565b9150826002028217905092915050565b61375a82612b09565b67ffffffffffffffff81111561377357613772612de5565b5b61377d82546134b1565b6137888282856136c8565b5f60209050601f8311600181146137b9575f84156137a7578287015190505b6137b18582613736565b865550613818565b601f1984166137c7866135b1565b5f5b828110156137ee578489015182556001820191506020850194506020810190506137c9565b8683101561380b5784890151613807601f89168261371a565b8355505b6001600288020188555050505b505050505050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601160045260245ffd5b5f61385782612b79565b915061386283612b79565b925082820390508181111561387a57613879613820565b5b92915050565b5f819050919050565b61389281613880565b82525050565b5f6080820190506138ab5f830187613196565b81810360208301526138bd8186612ca0565b90506138cc6040830185613196565b6138d96060830184613889565b95945050505050565b5f6060820190506138f55f830186612d4d565b6139026020830185613196565b61390f6040830184612d4d565b949350505050565b7f557365726e616d652063616e6e6f7420626520656d70747900000000000000005f82015250565b5f61394b601883612c90565b915061395682613917565b602082019050919050565b5f6020820190508181035f8301526139788161393f565b9050919050565b7f4d6573736167652063616e6e6f7420626520656d7074790000000000000000005f82015250565b5f6139b3601783612c90565b91506139be8261397f565b602082019050919050565b5f6020820190508181035f8301526139e0816139a7565b9050919050565b5f6080820190508181035f8301526139ff8187612ca0565b90508181036020830152613a138186612ca0565b9050613a226040830185613196565b613a2f6060830184613889565b95945050505050565b5f81905092915050565b5f613a4c82612b09565b613a568185613a38565b9350613a66818560208601612b23565b80840191505092915050565b5f613a7d8285613a42565b9150613a898284613a42565b91508190509392505050565b7f456d6f6a6920747970652063616e6e6f7420626520656d7074790000000000005f82015250565b5f613ac9601a83612c90565b9150613ad482613a95565b602082019050919050565b5f6020820190508181035f830152613af681613abd565b9050919050565b5f6060820190508181035f830152613b158186612ca0565b9050613b246020830185613196565b613b316040830184613889565b949350505050565b5f81519050919050565b5f82825260208201905092915050565b5f613b5d82613b39565b613b678185613b43565b9350613b77818560208601612b23565b613b8081612b31565b840191505092915050565b5f608082019050613b9e5f830187612d4d565b613bab6020830186612d4d565b613bb86040830185613196565b8181036060830152613bca8184613b53565b905095945050505050565b5f81519050613be381612a19565b92915050565b5f60208284031215613bfe57613bfd6129e6565b5b5f613c0b84828501613bd5565b91505092915050565b7f4e487b71000000000000000000000000000000000000000000000000000000005f52601260045260245ffd5b5f604082019050613c545f830185612d4d565b613c616020830184613196565b939250505056fea2646970667358221220f923b502b821daea0a33e60306665b3a8359185f035827d4780bc67b850314b364736f6c634300081e0033
+
+and monad 2048 for reference : 048: A Guide to Building High Performance Games on Monad
+Authors
+avatar
+Name
+Monad Foundation
+Twitter
+@monad_dev
+Introduction
+We built Monad2048 - an onchain implementation of 2048 - to demonstrate best practices for creating high-throughput, responsive onchain apps.
+
+2048-project-result
+Important Links
+Game: https://2048.monad.xyz/
+Contracts (Foundry): https://github.com/monad-developers/2048-contracts
+Frontend (Vite React): https://github.com/monad-developers/2048-frontend
+Verified smart contract: 0xe0FA8195AE92b9C473c0c0c12c2D6bCbd245De47
+Contents
+Background
+Requirements
+New Tiles and Limitations
+Gameplay Validation
+Smart Contract
+Design
+Encoding
+Storage
+API
+Example Game Flow
+Frontend
+User Onboarding
+Moving Web3 Logic to a Custom Hook (useTransaction)
+Sending Transactions
+General strategy
+Optimistic UI Updates
+Client-side libraries vs Direct RPC
+Nonce Management
+Handling Errors
+Summary
+Background
+The logic of smart contract applications is split between the offchain application code and the onchain smart contract.
+
+Some apps encode nearly all of their logic offchain and push occasional updates to the smart contracts. A trivial version would run the entire game in the frontend and only submit a transaction to the smart contract if the 2048 end state is achieved.
+
+Other apps include nearly all of their logic in the smart contracts; the frontend serves as an interface for preparing transactions and visualizing the contract state. An onchain 2048 would store the board state as smart contract state and generate each new tile using a VRF.
+
+These two extremes illustrate the tradeoff between UX and security:
+
+The first version has fast response times, but can easily be cheated by claiming that a 2048 was achieved or by choosing favorable new tiles.
+The second version is resilient to cheating, but has a worse UX if submitting each move is blocked by receiving a response for the previous move.
+Ideally, the game would offer robust cheating detterence and a snappy UX.
+
+Requirements
+The baseline expectations for an onchain 2048 game are:
+
+The game logic should not need a backend
+Each move should be validated onchain according to the rules.
+A new tile should appear instantly upon a completed move.
+New Tiles and Limitations
+In 2048, whenever a user makes a move, a new tile is added to the board at a randomly chosen empty tile slot. The new tile is randomly assigned a value of 2 (with 90% probability) or 4 (with 10% probability).
+
+We submit each new move to the smart contract, which maintains the game's latest board state. To make the UX responsive, the smart contract's logic is emulated on the frontend.
+
+The key design question, now, is where and how are new tiles generated?
+
+There are a few options:
+
+Make this choice within the browser by calling a random number generator
+Make this choice within the smart contract, perhaps using an external VRF, in response to seeing a move be committed.
+Make this choice within the browser by calling a deterministic random number generator, perhaps with occasional feedback from the smart contract to prevent the ability to peek too far ahead.
+Approach (1) is not viable because it would make cheating trivial - the ideal next tile can be chosen directly by the user.
+
+Approach (2) is ideal because it would mean in each new tile is generated completely randomly. Unfortunately, it's not practical because it would require each transaction to be committed before revealing the next tile. This means gameplay would be unacceptably slow.
+
+Approach (3) is the solution we implemented because it provides a balanced approach. The user commits a seed when starting a new game. This seed is used in a deterministic formula to determine where new tiles are spawned upon a given new move and resultant board.
+
+This does not eliminate all scope of cheating. A bot can still attempt to construct a series of desirable, valid boards using some optimal strategy. However, compared to approach (1), the bot cannot freely choose new tiles, making cheating more difficult.
+
+NOTE
+
+A fancier version of (2) would require input from the smart contract from a few seconds ago (e.g. a VRF output after submitting a move a few moves ago) to be an input to the current hash function.
+
+This would allow a bot slight lookahead while utilizing this lookahead to serve new tiles prior to a move being included in the block. If you are interested, consider forking the code and trying it yourself!
+
+Gameplay Validation
+The Monad2048 smart contract contains the logic to validate a board position as a result of applying a legal move (Up, Down, Left or Right) on the current board position of a game.
+
+For all ongoing games, the contract stores the current board position and processes new moves incrementally. This allows a user to resume the same game upon refreshing their browser.
+
+An alternative mechanism we considered was having users only submit winning sequences of boards (e.g. terminating-in-2048). The downside of this approach is that any unexpected interruptions on the browser result in a user losing their entire game.
+
+Smart Contract
+The Monad2048 contract serves as an onchain game engine that verifies all user interactions.
+
+Design
+The design goals of the smart contract are:
+
+Immutable and publicly verifiable game rules.
+Exclusive write access to a user’s own game state, preventing impersonation.
+Resistance to common cheating vectors (e.g. move replay and invalid state transitions).
+The core game logic resides in a library (LibBoard). Move generation is delegated to the player and the contract focuses solely on validating submitted state transitions.
+
+Encoding
+To minimize storage and computation costs, the 4x4 game board state is encoded into a single uint128. Each one of the 16 tiles of the board occupies 1 byte, storing log2(tileValue). For example, a tile with value 8 is stored as 0x03.
+
+Helper functions in LibBoard allow inspection of the encoded board:
+
+function getTile(uint128 board, uint8 pos) public pure returns (uint8) {
+return uint8((board >> ((15 - pos) * 8)) & 0xFF);
+}
+Storage
+The contract avoids redundant data storage by only persisting the latest board for each game. All prior moves can be reconstructed off-chain using indexed events.
+
+struct GameState {
+uint8 move;
+uint120 nextMove;
+uint128 board;
+}
+
+/// @notice Mapping from game ID to the latest board state.
+mapping(bytes32 gameId => GameState state) public state;
+What’s not stored:
+
+Full move history
+2D board layouts
+Instead, external tools (e.g. indexers, RPC logs) can reconstruct the history for leaderboard or analysis purposes.
+
+API
+The contract exposes only two functions for gameplay:
+
+Start game: The player submits the first four boards of their game (initial board + the first 3 moves and their result). The contract verifies that this exact game has not been played before.
+function startGame(bytes32 gameId, uint128[4] calldata boards, uint8[3] calldata moves) external;
+Play: The player submits a new board state resulting from a player move. The contract calls LibBoard.validateTransformation to ensure resultBoard is a valid transition (that honours the game’s randomness seed) from the current latestBoard[gameId].
+function play(bytes32 gameId, uint8 move, uint128 resultBoard) external;
+The chances of two players playing an identical game after 3 moves is less than 1 in a billion. We prevent playing identical games to prevent the simple cheating strategy of move copying.
+
+It is possible for a malicious actor to grief our smart contract. One can front run in-flight startGame transactions and prevent games from starting.
+
+One possible solution here is to ask players to request a new game in one transaction, and have the smart contract fulfill this request in a subsequent transaction with a a unique start position.
+
+We use a one-step startGame solution since there is no direct economic incentive to grief the smart contract. This also lets the client start new games without any latency in waiting for a start position from the smart contract.
+
+Example Game Flow
+You can see a winning 1,000+ move game played on the smart contract here. Enter game ID: 0xc2da301cc952f9c35dc1daa96a0c5d2d1d8ff8b366403fa93a946f6e9661edb9.
+
+successful-game
+thousand-move-game
+The flow of the gameplay is as follows:
+
+Client generates a unique gameId.
+Client simulates the first 3 moves locally, producing boards[0] (initial), boards[1], boards[2], boards[3].
+Client calls startGame(gameId, boards).
+For subsequent moves:
+Client computes the new board (resultBoard) state locally based on user input of a move, and the gameId used as an input in a deterministic formula as the source of randomness.
+Client calls play(gameId, resultBoard).
+Frontend
+To support gameplay at 'button mashing' speeds, the frontend must handle transactions efficiently without blocking the UI.
+
+User Onboarding
+Embedded wallets such as Privy provide a seamless onboarding experience using email or social logins. They allow applications to sign and send transactions frequently without requiring user confirmation for every action (popup fatigue).
+
+This requires careful consideration of security. In this 2048 game, the only actions possible are related to playing the game, limiting potential risks. The open-source nature of the frontend allows verification.
+
+We use Privy’s embedded wallet API for our 2048 demo. For example, the following is a simple login button component using the @privy-io/react-auth library.
+
+import { usePrivy, useLogin, useLogout } from '@privy-io/react-auth'
+
+export default function LoginButton() {
+const { login } = useLogin()
+const { logout } = useLogout()
+
+const { user, authenticated } = usePrivy()
+
+return (
+<div>
+{user && authenticated ? (
+<div>
+<button onClick={logout}>Logout</button>
+<p>Logged in as: {user?.wallet?.address}</p>
+</div>
+) : (
+<button onClick={login}>Login</button>
+)}
+</div>
+)
+}
+(Simplified component; the actual implementation includes styling and initialization logic)
+
+Moving Web3 Logic to a Custom Hook (useTransaction)
+All wallet interactions and transaction logic are encapsulated within a custom React hook (useTransaction). This provides several benefits:
+
+Reusability: Use across different components needing transaction capabilities.
+Scoped Logic: Isolates web3 interactions, simplifying debugging.
+Centralized State Management: Manages essential states like nonce and the wallet provider instance.
+// Inside useTransaction hook
+const { user } = usePrivy()
+const userNonce = useRef(0)
+
+useEffect(() => {
+async function getNonce() {
+if (!user?.wallet?.address) return
+
+
+// Fetch the current nonce from the network on login/wallet change
+const nonce = await publicClient.getTransactionCount({
+  address: user.wallet.address as Hex,
+})
+userNonce.current = nonce
+}
+getNonce()
+}, [user]) // Dependency ensures nonce is fetched when user logs in
+// Inside useTransaction hook
+const { ready, wallets } = usePrivy()
+const walletClient = useRef<any>(null) // Stores the viem WalletClient
+
+useEffect(() => {
+async function getWalletClient() {
+if (!ready || !wallets || !user?.wallet) return
+
+
+// Find the embedded Privy wallet
+const userWallet = wallets.find((w) => w.address === user.wallet?.address)
+if (!userWallet) return
+
+const ethereumProvider = await userWallet.getEthereumProvider()
+const provider = createWalletClient({
+  chain: monadTestnet, // Configure with Monad Testnet details
+  transport: custom(ethereumProvider),
+})
+walletClient.current = provider
+}
+getWalletClient()
+}, [user, ready, wallets]) // Re-initialize if wallet context changes
+Sending Transactions
+A robust strategy is needed to send transactions rapidly without blocking the UI or failures due to nonce mismatches.
+
+General strategy
+A core function sendRawTransactionAndConfirm handles signing, broadcasting (via direct RPC call), and optionally awaiting confirmation of a transaction.
+Higher-level functions (initializeGameTransaction, playNewMoveTransaction) prepare transaction data (to, data, gas) specific to the game actions and call the core function.
+Optimistic UI Updates
+The UI updates immediately upon a user input such as pressing an arrow key.
+The transaction sending function (initializeGameTransaction or playNewMoveTransaction) is called asynchronously in the background.
+Crucially, the game logic does not wait for the transaction to confirm before allowing the next move. However, upon the failure of a transaction in a background async call, the game reverts back to the last valid board state and offers the user to sync their game.
+// Inside the move handling logic in App.tsx:
+
+// Block user interactions
+setIsAnimating(true)
+
+// Create a new copy to avoid mutation issues
+const boardWithRandomTile = {
+tiles: [...newBoardState.tiles],
+score: newBoardState.score,
+}
+// Add tile honouring the contract's handling of randomness seed
+addRandomTileViaSeed(boardWithRandomTile)
+
+// Non-blocking: send transactions
+if (moveCount === 3) {
+// Corresponds to startGame call
+initializeGameTransaction(/* args /).catch(handleTxError) // Handle potential errors
+} else if (moveCount > 3) {
+// Corresponds to play call
+playNewMoveTransaction(/ args */).catch(handleTxError)
+}
+
+// Triggers new tile animation
+setBoardState(boardWithRandomTile)
+
+// Resume user interactions
+setIsAnimating(false)
+Client-side libraries vs Direct RPC
+Libraries like viem or ethers are excellent for general-purpose use but often include pre-flight simulations before sending a transaction (eth_sendRawTransaction).
+
+In high-frequency scenarios where transaction n depends on the state change from transaction n-1 (which may not be confirmed yet), these simulations will fail.
+
+Solution: Use viem primarily for signing, but broadcast the signed transaction directly using an RPC call (eth_sendRawTransaction). Test the client’s logic for generating transaction inputs in a smart contract test suite beforehand to ensure smooth gameplay on the client.
+
+// Inside sendRawTransactionAndConfirm function
+const provider = walletClient.current // Get WalletClient instance from useRef
+const signedTransaction = await provider.signTransaction({
+to: GAME_CONTRACT_ADDRESS,
+account: user?.wallet?.address as Hex,
+data, // Encoded function call
+nonce, // Managed locally
+gas,
+maxFeePerGas: parseGwei('50'), // Set appropriate gas params for Monad testnet
+maxPriorityFeePerGas: parseGwei('2'),
+})
+
+// Direct RPC call to broadcast
+const response = await post({
+url: monadTestnet.rpcUrls.default.http[0],
+params: {
+id: 0,
+jsonrpc: '2.0',
+method: 'eth_sendRawTransaction',
+params: [signedTransaction],
+},
+})
+// ... handle response and potential confirmation waiting ...
+Nonce Management
+The userNonce stored in useRef is incremented synchronously immediately before a transaction is signed and sent.
+If a function sends multiple transactions the nonce must be incremented appropriately for each transaction.
+
+const nonce = userNonce.current;
+userNonce.current = nonce + 1; // Increment ref before async calls
+
+// Send prepareGame with nonce
+await sendRawTransactionAndConfirm({ ..., nonce });
+Handling Errors
+error-state
+The lowest level function (sendRawTransactionAndConfirm) is wrapped in a try-catch block. On failure, it
+
+resets the locally stored nonce by re-fetching the active user nonce from the provider (eth_getTransactionCount).
+Notifies the user via a toast.
+Propagates the error upwards.
+Higher-level functions (initializeGameTransaction, playNewMoveTransaction) do not handle any errors as they do not update any app state by themselves. They simply propagate errors up to the UI component.
+
+The top-level UI component catches any error and pauses the game with an error state UI.
+
+const [gameError, setGameError] = useState<boolean>(false)
+const [gameErrorText, setGameErrorText] = useState<string>('')
+Since transaction functions (initializeGameTransaction, playNewMoveTransaction) run asynchronously in the background with catch clauses, multiple such catch clauses can run in case even one transaction errors (i.e. the first errored transaction and all future transactions already broadcasted to RPC).
+
+Therefore, whenever a transaction errors, we store the board state associated with that transaction in a list and identify the board with the lowest score as the one to reset to.
+
+// Stores all board states that have errored out.
+const [resetBoards, setResetBoards] = useState<BoardState[]>([])
+
+// Identifies the board with the lowest score.
+useEffect(() => {
+const boards = resetBoards
+
+if (boards.length > 0) {
+const scores = boards.map((b) => b.score)
+const idx = scores.indexOf(Math.min(...scores))
+
+
+setBoardState(boards[idx])
+}
+}, [resetBoards])
+
+// Called whenever a transaction errors. Stores the board state associated
+// associated with the transaction in a list.
+function resetBoardOnError(premoveBoard: BoardState, currentMove: number, error: Error) {
+if (!gameError) {
+setGameError(true)
+setGameErrorText(error.message)
+
+
+setResetBoards((current) => [...current, premoveBoard])
+setPlayedMovesCount(currentMove)
+
+setIsAnimating(false)
+}
+}
+We then offer the user to re-sync and continue with their current game. On re-syncing the game, the client fetches the game’s latest board state to ensure it is correct.
+
+Summary
+We've just built an onchain implementation of 2048 where every move is played and validated on a smart contract, and the game frontend delivers a snappy UX while handling a high throughput of transactions.
+
+The blockchain as an execution environment creates certain limitations — no atomically available true randomness, potential front-running of in-flight transactions / griefing, etc. It is important to understand and design around these limitations.
+
+Selecting deterministic game rules allowed for optimistic UI updates before transactions are confirmed on the blockchain, delivering a great user experience. Monad Testnet blocks are as fast as the blink of an eye; you should endeavor to make your app updates at least as fast.
+
+here are my requirements: a twitch liked app but with un ique components and blockchain integration in it
+
+unique i mean anyone can come and input twitch username of any streamer an;d start playing it right then that app will have real time comments appearing on side just like twiotch right with wtitch's comment api now first blockchain integration here will be that every comment will act as an action where that comment is used by app to do a tarnsaction on blockchain  , in that tarNSACTIOn it will interavct with an contract with comment function now that is inspired by monad 2048 game where every move is contract interaction by play function right, jhere we will use comment in place of play and just like monad 2048 that every move gave an explorer link right, here every comment will also have an explorer link real tiome where it shows that it interatec with contract as comment funcytion i will share monad 20478 game details again below after that I wanted a facebook gaming like experienece where there are ermojis to react on stream and those emojis are 3d with motion and they flow in aiur like 3d whenever usr click on them now this will again be a blockchain integration where that reacvtion will also be part of the app where it acts like [play of monad 2048 but here it is react and every reaction when user clciks acts as an blockchain interaction transaction with react action of that contract and it also have an exploer link attached to it real time I wanted a screen capiutre on my app where anynyone can capture a moment of the stream and then mint that moment as an nft in just one click
+
+fpor referenbce of this read this or use ur knowledfge Explore the concept of minting NFTs in real-time during a livestream. How can creators use this to capture special moments and reward engaged viewers?What’s the Big Deal About Live Minting?Imagine this: you’re online, absolutely streaming your live stream. You hit a crazy milestone, land the perfect joke, or create a masterpiece during a collaborative art session. In that electrifying moment, bam! You can mint a unique NFT capturing that magic for everyone to see (and potentially own your piece).When Livestreaming Meets NFTsThe concept of live minting is still fresh, but it’s already generating a ton of excitement. Platforms like https://nbatopshot.com/ are using NFTs to create a new era of sports memorabilia through exclusive video highlights and streamlivr is the go-to for creating NFTs for your content.At Streamlivr, we’re passionate about empowering streamers. We believe live minting has the potential to be a game-changer, allowing you to own your content, connect deeper with your audience, and unlock new revenue streams. We’re actively exploring ways to integrate this innovative feature into our platform, so stay tuned!Here’s how it elevates your streams:Capture Special Moments: Live minting lets you immortalize those unforgettable stream highlights. Was it a hilarious blooper? A record-breaking donation drive? Now you have a permanent, collectible record everyone can share.
+Reward Engaged Viewers: Imagine offering a limited-edition NFT to your most loyal viewers during a live giveaway. It’s a fantastic way to show appreciation and create a sense of community.
+Unlock New Revenue Streams: NFTs can be sold or auctioned, opening up exciting possibilities for monetization. Think exclusive behind-the-scenes content, personalized shoutouts, or even in-stream challenges where the winner gets a unique NFT.
+In the meantime, get creative! Think about the kind of NFTs you’d create during your streams. How would you use them to engage your viewers and build a stronger community? Share your ideas in the comments below!Let’s turn those live moments into unforgettable NFT memories!Follow us on Twitteruse will just click the captute moment, capture that moment on screen and then mint it by clicking mint and that moment as an image gets minted in the user's wallet now you might ask blockchain right? whpo will pay the gas fees for all actions and interactioins with contract? here comes the part of privy every user that enters the app first havre to create a new privy embedded wallet either with email , , gpoogle, twitter or anything then they need to fund that wallet right because that wallet will act as a wallet which takes alll these above actions on the behald of the user its embedded wallet using sessions to sign txns on behalf of you using privy tech(servers) and uses TEE + SSS for executing txnsthis is what monad 2-048 used, where every transaction and iunteraqction etc where gas fes is required by wasllet to do so it does that it self, like the privy wallet does that without user's approval for each of those transactions right and whenevre there are not sufficient funds to take any of the actions, privcy will just popup and ask uyser tpo fund gas in that weallet so these bvlockchain actions could be performed, others it won't perform and keep asking for gas until usert fills the gas so it will become a permissioless app where users can have fun watching while all the onchain taska are either done by priovy wallets without approvsls or in one click in case of nft nowI already shared monad 2048's details abpve, also shared everything about privy can we restrart evertything from scartch even new contracts to deploy and making sure every contract and its funcyion is correct and working and is using monad testnet and monad 2048 as refernbce of all this
